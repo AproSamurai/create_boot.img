@@ -31,8 +31,6 @@ on init
 
 on early-fs
     mount tmpfs nodev /tmp
-    insmod /lib/modules/dpram_recovery.ko
-    insmod /lib/modules/param.ko
 
 
 on post-fs
@@ -65,6 +63,14 @@ service recovery /sbin/recovery
 
 service adbd /sbin/adbd recovery
     disabled
+
+# Always start adbd on userdebug and eng builds
+on property:ro.debuggable=1
+    start adbd
+
+# Restart adbd so it can run as root
+on property:service.adb.root=1
+    restart adbd
 
 on property:persist.service.adb.enable=1
     start adbd
