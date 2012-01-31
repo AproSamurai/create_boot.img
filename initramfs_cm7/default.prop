@@ -6,4 +6,3 @@ ro.allow.mock.location=0
 ro.debuggable=1
 persist.service.adb.enable=1
 persist.sys.usb.config=mass_storage,adb
-ro.build.display.id=Shuriken ICS
