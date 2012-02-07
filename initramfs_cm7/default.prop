@@ -5,4 +5,9 @@ ro.secure=1
 ro.allow.mock.location=0
 ro.debuggable=1
 persist.service.adb.enable=1
+<<<<<<< HEAD
 persist.sys.usb.config=mass_storage,adb
+=======
+persist.sys.usb.config=mass_storage,adb,adb
+ro.build.display.id=Shuriken ICS
+>>>>>>> parent of 5808dcd... Updated to make newer init files and recovery files.
