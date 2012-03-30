@@ -27,10 +27,10 @@ function PACKAGE_BOOTIMG()
 		local KERNEL_INITRD="$2"
 		local RECOVERY_INITRD="$3"
 		echo "create ramdisk.img"
-		mkbootfs $KERNEL_INITRD | minigzip > ramdisk-kernel.img
+		./mkbootfs $KERNEL_INITRD | ./minigzip > ramdisk-kernel.img
 		echo "create ramdisk-recovery.img"
-		mkbootfs $RECOVERY_INITRD > ramdisk-recovery.cpio
-		minigzip < ramdisk-recovery.cpio > ramdisk-recovery.img
+		./mkbootfs $RECOVERY_INITRD > ramdisk-recovery.cpio
+		./minigzip < ramdisk-recovery.cpio > ramdisk-recovery.img
 		if [ -f boot.img ] ; then
 			echo "removing old boot.img"
 			rm -f boot.img
