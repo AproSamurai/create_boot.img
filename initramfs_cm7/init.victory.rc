@@ -12,9 +12,11 @@ on init
 
 on fs
   # External microSDcard storage
-  export EXTERNAL_STORAGE /mnt/sdcard
-  mkdir /mnt/sdcard 0000 system system
-  symlink /mnt/sdcard /sdcard
+  export EXTERNAL_STORAGE /storage/sdcard0
+  mkdir /storage 0050 system sdcard_r
+  mkdir /storage/sdcard0 0000 system system
+  symlink /storage/sdcard0 /sdcard
+  symlink /storage/sdcard0 /mnt/sdcard
 
 on post-fs
   # Load vibrator modules
@@ -31,7 +33,7 @@ on post-fs
   exec /system/xbin/busybox mknod -m 0660 /dev/swmxctl c 234 0
   exec /system/xbin/busybox mknod -m 0660 /dev/uwibro c 233 0
   chown system system /dev/swmxctl
-  chown system system /dev/uwibro
+  exec /system/xbin/busybox chown system.system /dev/uwibro
 
   # For sensor control
   chown system input /sys/class/input/input0/enable
@@ -56,11 +58,11 @@ on post-fs
   chown system input /sys/class/input/input2/delay
   chown system input /sys/class/input/input2/wake
 
-  chown system input /sys/class/input/input3/enable
-  chown system input /sys/class/input/input3/delay
-  chown system input /sys/class/input/input3/wake
+  chown compass input /sys/class/input/input3/offsets
 
-  chown compass input /sys/class/input/input4/offsets
+  chown system input /sys/class/input/input4/enable
+  chown system input /sys/class/input/input4/delay
+  chown system input /sys/class/input/input4/wake
 
   chown system input /sys/class/input/input5/enable
   chown system input /sys/class/input/input5/delay
@@ -87,11 +89,14 @@ on boot
   setprop status.battery.level_raw  50
   setprop status.battery.level_scale 9
 
+  # Set our own bdaddr path
+  setprop ro.bt.bdaddr_path /data/bdaddr
+
   # Phone
   setprop ro.telephony.call_ring.multiple 0
 
   # Enable WiFi
-  setprop wifi.interface "eth0"
+  setprop wifi.interface "wlan0"
 
   # Change ownerships for USB
   chown radio system /sys/class/sec/switch/usb_sel
@@ -169,7 +174,7 @@ on boot
   chown radio radio /sys/class/mdnieset_ui/switch_mdnieset_ui/mdnieset_ui_file_cmd
   chown radio radio /sys/class/mdnieset_outdoor/switch_mdnieset_outdoor/mdnieset_outdoor_file_cmd
 
-  chown radio system /sys/devices/platform/s3cfb/spi_gpio.3/spi3.0/backlight/s5p_bl/brightness
+  chown system system /sys/class/backlight/s5p_bl/brightness
   chown radio system /sys/devices/platform/s3cfb/lcd_power
 
   # Change ownerships for touchkey
@@ -227,6 +232,10 @@ on boot
   chown system system /dev/ttyGS0
   chown system system /dev/dun
 
+  # EpicParts: Disable Touchkey Lights
+  chown root system /sys/devices/virtual/sec/t_key/touchleds_disabled
+  chmod 0664 /sys/devices/virtual/sec/t_key/touchleds_disabled
+
   # Set keypad delays to recommended values.
   write /sys/devices/platform/s3c-keypad/column_delay 5
   write /sys/devices/platform/s3c-keypad/timer_delay  5
@@ -256,6 +265,9 @@ on property:ril.cdma.data_state=1
 on property:ril.cdma.data_state=0
   stop pppd_cdma
 
+on property:ril.bt_macaddr=*
+  start bdaddr
+
 on post-fs-data
   # Create data/gps for GPS daemon
   mkdir /data/gps 771 gps system
@@ -270,6 +282,9 @@ on post-fs-data
   mkdir /data/download 0770 system cache
 
   setprop vold.post_fs_data_done 1
+
+on property:dev.bootcomplete=1
+  class_start late_start
 
 ###############################################################################
 #-------------------- End Triggers / Actions ---------------------------------#
@@ -292,18 +307,29 @@ service pvrsrvinit /system/vendor/bin/pvrsrvinit
 
 #- End core Services -#
 #- Begin main Services -#
-service wpa_supplicant /system/bin/wpa_supplicant -Dwext -ieth0 -c/data/misc/wifi/wpa_supplicant.conf
+service wpa_supplicant /system/bin/wpa_supplicant \
+               -iwlan0 -Dnl80211 -c/data/misc/wifi/wpa_supplicant.conf -e/data/misc/wifi/entropy.bin
   class main
-  socket wpa_eth0 dgram 0660 wifi wifi
+  socket wpa_wlan0 dgram 0660 wifi wifi
   disabled
   oneshot
 
-service dhcpcd_eth0 /system/bin/dhcpcd -ABKL
+service dhcpcd_wlan0 /system/bin/dhcpcd -ABKL
   class main
   disabled
   oneshot
 
-service iprenew_eth0 /system/bin/dhcpcd -n
+service dhcpcd_p2p /system/bin/dhcpcd -aABKL
+  class main
+  disabled
+  oneshot
+
+service iprenew_wlan0 /system/bin/dhcpcd -n
+  class main
+  disabled
+  oneshot
+
+service iprenew_p2p /system/bin/dhcpcd -n
   class main
   disabled
   oneshot
@@ -314,6 +340,12 @@ service pppd_cdma /system/bin/pppd_runner
   group radio cache inet misc system
   disabled
   oneshot
+
+service bdaddr /system/bin/bdaddr_read
+    class main
+    user root
+    disabled
+    oneshot
 
 # for Broadcom Bluetooth
   service hciattach /system/bin/brcm_patchram_plus -d --enable_hci --baudrate 3000000 --patchram /system/bin/BCM4329B1_002.002.023.0746.0832.hcd /dev/s3c2410_serial0
@@ -345,6 +377,7 @@ service orientationd /system/bin/orientationd
   class late_start
   user compass
   group system input
+  disabled
 
 service geomagneticd /system/bin/geomagneticd
   class late_start
